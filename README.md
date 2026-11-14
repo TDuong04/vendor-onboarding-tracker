@@ -37,7 +37,7 @@ Code layout (each file has one job):
 | `backend/src/stages.js` | Workflow rules and stuck logic. Pure functions, no DB, no clock. |
 | `backend/src/db.js` | Schema and seed data. |
 | `backend/src/vendors.js` | List vendors, read history, change a stage. |
-| `backend/src/server.js` | Login and 3 endpoints. Thin. |
+| `backend/src/server.js` | Login and 4 endpoints (list, history, change stage, log note). Thin. |
 | `frontend/` | Plain HTML + JS, no framework. Served by the backend. |
 | `backend/test/` | Tests. |
 
@@ -49,10 +49,15 @@ Code layout (each file has one job):
 - **The clock is a parameter** (`now`), so tests freeze time instead of waiting for days.
 - **Errors are one small class (`AppError`)** carrying an HTTP status. One handler turns it into a response.
 
+## Domain note: KYC
+
+I did not know what "KYC" meant when I started. I looked it up: it stands for "Know Your Customer", the identity and legitimacy check a company runs on a new customer or partner before doing business with them. From that I inferred how it fits this workflow: the vendor sends documents, Compliance reviews them, and the vendor cannot go Active until the review passes. That inference is why the app does not allow skipping straight to Active, and why a failed review leaves the vendor at "KYC Docs Received" instead of moving it. I have not seen Shopee's real compliance process, so details beyond what the PDF says are my reading of it.
+
 ## Assumptions
 
-- A move is **one step forward or one step back**. No skipping, so nobody reaches Active without KYC. Going back exists to fix mistakes; the history keeps the record.
-- A failed KYC review is **not a stage change**: the vendor stays at "KYC Docs Received" and the coordinator can add a note explaining it. (The compliance review itself is out of scope.)
+- A move is **one step forward or one step back**. The PDF only says "move to a different stage", so this is deliberately stricter. The trade-off: a vendor that is two stages off needs two moves, but nobody can jump to Active without passing KYC, and every correction is visible in the history. If Ops wanted free-form moves it is a one-function change (`isMoveAllowed`). Going back exists to fix mistakes; the history keeps the record.
+- A failed KYC review is **not a stage change**: the vendor stays at "KYC Docs Received" and the coordinator uses **Log note** to record it (e.g. "asked vendor to resend license"). The note is saved as a history row with the same stage before and after, so who/when is kept. Logging a note does **not** restart the days-in-stage count, because the vendor has not progressed. (The compliance review itself is out of scope.)
+- The vendor list shows the **latest note** and who wrote it, even if later stage moves had no note. The full list is in History.
 - **Stuck = strictly more than 7 days** in the current stage. Exactly 7 is not stuck. **Active is never stuck.**
 - Any logged-in coordinator can move any vendor. The "Coordinator" column shows who owns the vendor but does not restrict anything.
 - Days are whole days measured in UTC timestamps.
@@ -68,7 +73,7 @@ Code layout (each file has one job):
 ## What I tested and why
 
 - `backend/test/stages.test.js`: the rules. Boundary of "stuck" (7 vs 8 days), Active never stuck, skipped/same/unknown moves. These are the business rules most likely to be wrong by one.
-- `backend/test/vendors.test.js`: history is written correctly (who/when/from/to), a change restarts the stuck clock, rejected moves write nothing, stale updates are rejected.
+- `backend/test/vendors.test.js`: history is written correctly (who/when/from/to), a stage change restarts the stuck clock but a note-only entry does not, rejected moves write nothing, stale updates are rejected, missing `expectedStage` is a 400.
 - `backend/test/api.test.js`: endpoints need login, and the recorded user comes from the login.
 
 ## Next, if I had more time
