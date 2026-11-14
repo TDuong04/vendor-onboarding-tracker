@@ -2,6 +2,10 @@
 
 Small web app that replaces the onboarding spreadsheet. Coordinators log in, see every vendor's stage, move vendors along the 5 stages, read the history, and see which vendors are stuck.
 
+How I used AI on this assignment: see [AI-NOTE.md](AI-NOTE.md).
+
+**README status: finalized for submission.**
+
 ## Run it
 
 Needs Node 22.13 or newer.
@@ -75,9 +79,17 @@ Code layout (each file has one job):
 - `backend/test/vendors.test.js`: history is written correctly (who/when/from/to), a stage change restarts the stuck clock but a note-only entry does not, rejected moves write nothing, stale updates are rejected, missing `expectedStage` is a 400.
 - `backend/test/api.test.js`: endpoints need login, and the recorded user comes from the login.
 
+## Status
+
+- **Completed:** all four requirements in the PDF (login, view vendors, change stage with who/when/from/to history, stuck detection computed from history), a way to log a note without moving the stage, 23 automated tests, and this write-up.
+- **Remains:** nothing the PDF requires. Known gaps are listed under "Shortcuts" (shared demo password, in-memory data, no UI tests, no filtering).
+- **Next:** see "Next, if I had more time" below.
+
 ## Next, if I had more time
 
 1. Persist to a SQLite file and add a real login (hashed passwords, expiring sessions).
 2. Filters: "only stuck", by coordinator, by region. Sort by days in stage.
 3. Per-stage stuck limits (KYC review probably deserves a different limit than contract signing) and a "why was this moved back" requirement.
 4. Browser tests for the UI.
+5. **Track the work as tickets (e.g. Jira).** With a team I would break the work into tickets and review them with a PM. I did not do that here: working alone, I would be writing, prioritising and reviewing my own tickets, which adds ceremony without a second opinion. Tickets pay off most when there is a customer or stakeholder whose feedback shows which ticket needs to change and why. Here the requirements are clear, and the parts that are not clear are written down as assumptions in this README, so the spec (`docs/spec.md`), its requirement-to-code table and small commits did that job instead.
+6. **Use conventional commit messages** (`feat:`, `fix:`, `docs:`, `test:`). I did not, because I do not know how Shopee's repositories name commits, and I did not want to guess a convention that might not match. With more time I would ask, then follow it, because a consistent format makes the history easier to scan and lets release notes be generated from it.

@@ -1,6 +1,3 @@
-// Plain JavaScript, no framework. Flow: log in -> load vendors -> draw table -> repeat after every change.
-// Text is always set with textContent (never innerHTML), so vendor data cannot inject HTML.
-
 const $ = (id) => document.getElementById(id);
 
 let token = sessionStorage.getItem('token');
