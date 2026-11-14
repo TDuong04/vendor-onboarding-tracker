@@ -1,0 +1,15 @@
+{
+  "name": "vendor-onboarding-tracker",
+  "version": "1.0.0",
+  "description": "Small app that replaces the vendor onboarding spreadsheet.",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
