@@ -65,7 +65,7 @@ async function loadVendors() {
 function vendorRow(v) {
   const stageCell = el('td', {}, v.stage);
   if (v.stuck) stageCell.append(el('span', { class: 'badge' }, 'STUCK'));
-  if (v.note) stageCell.append(el('div', {}, v.note));
+  if (v.note) stageCell.append(el('div', {}, `${v.note} (${v.note_by})`));
 
   const historyBox = el('div');
   const historyButton = el('button', {}, 'History');
@@ -83,27 +83,30 @@ function vendorRow(v) {
   return row;
 }
 
-// One step back and one step forward, if they exist.
+// A note box, one step back, one step forward (if they exist), and "Log note" (note without moving).
 function moveControls(v) {
   const i = stages.indexOf(v.stage);
-  const note = el('input', { placeholder: 'Note (optional)' });
+  const note = el('input', { placeholder: 'Note' });
   const buttons = [];
   for (const target of [stages[i - 1], stages[i + 1]]) {
     if (!target) continue;
     const arrow = stages.indexOf(target) > i ? `${target} →` : `← ${target}`;
     const button = el('button', {}, arrow);
-    button.addEventListener('click', () => moveVendor(v, target, note.value));
+    button.addEventListener('click', () => send(v, 'stage', { newStage: target, note: note.value }));
     buttons.push(button);
   }
-  return [note, ...buttons];
+  const logNote = el('button', {}, 'Log note');
+  logNote.addEventListener('click', () => send(v, 'note', { note: note.value }));
+  return [note, ...buttons, logNote];
 }
 
-async function moveVendor(vendor, newStage, note) {
+// Sends a change for one vendor. kind is "stage" or "note".
+async function send(vendor, kind, body) {
   $('message').textContent = '';
   try {
-    await api(`/api/vendors/${vendor.id}/stage`, {
+    await api(`/api/vendors/${vendor.id}/${kind}`, {
       method: 'POST',
-      body: JSON.stringify({ expectedStage: vendor.stage, newStage, note }),
+      body: JSON.stringify({ expectedStage: vendor.stage, ...body }),
     });
   } catch (err) {
     $('message').textContent = err.message; // e.g. someone else already moved it
@@ -116,7 +119,8 @@ async function toggleHistory(vendorId, box) {
   const changes = await api(`/api/vendors/${vendorId}/history`);
   const items = changes.map((c) => {
     const when = new Date(c.changed_at).toLocaleString();
-    const move = c.from_stage ? `${c.from_stage} → ${c.to_stage}` : `Started at ${c.to_stage}`;
+    const noteOnly = c.from_stage === c.to_stage;
+    const move = noteOnly ? `Note at ${c.to_stage}` : c.from_stage ? `${c.from_stage} → ${c.to_stage}` : `Started at ${c.to_stage}`;
     return el('li', {}, `${when} - ${c.changed_by}: ${move}${c.note ? ` (${c.note})` : ''}`);
   });
   box.replaceChildren(el('ul', { class: 'history' }, ...items));

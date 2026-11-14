@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { openDb, seed, COORDINATORS } from './db.js';
-import { listVendors, getHistory, changeStage, AppError } from './vendors.js';
+import { listVendors, getHistory, changeStage, addNote, AppError } from './vendors.js';
 import { STAGES, STUCK_AFTER_DAYS } from './stages.js';
 
 // Mock accounts: every coordinator uses the same demo password. Not for production.
@@ -52,6 +52,19 @@ export function createApp(db, getNow = () => new Date()) {
       newStage,
       note,
       user: req.user, // who changed it comes from the login, never from the request body
+      now: getNow(),
+    });
+    res.json(vendor);
+  });
+
+  // Log a note without changing the stage (e.g. a failed KYC review).
+  app.post('/api/vendors/:id/note', (req, res) => {
+    const { expectedStage, note } = req.body ?? {};
+    const vendor = addNote(db, {
+      vendorId: Number(req.params.id),
+      expectedStage,
+      note,
+      user: req.user,
       now: getNow(),
     });
     res.json(vendor);

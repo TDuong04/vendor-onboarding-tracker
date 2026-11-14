@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb, seed } from '../src/db.js';
-import { listVendors, getHistory, changeStage } from '../src/vendors.js';
+import { listVendors, getHistory, changeStage, addNote } from '../src/vendors.js';
 
 const NOW = new Date('2026-08-10T12:00:00Z');
 
@@ -91,4 +91,62 @@ test('bad notes are rejected and nothing is written', () => {
   assert.equal(getHistory(db, f.id).length, 1);
   move('x'.repeat(500))(); // exactly the limit is fine
   assert.equal(getHistory(db, f.id).length, 2);
+});
+
+test('a note without moving keeps the stage and does NOT restart the stuck clock', () => {
+  const db = setup();
+  const b = find(db, 'Company B'); // KYC Docs Received for 12 days
+  addNote(db, { vendorId: b.id, expectedStage: 'KYC Docs Received', user: 'Mai', now: NOW, note: 'KYC failed, asked vendor to resend license' });
+
+  const after = find(db, 'Company B');
+  assert.equal(after.stage, 'KYC Docs Received');
+  assert.equal(after.days_in_stage, 12);
+  assert.equal(after.stuck, true);
+  assert.equal(after.note, 'KYC failed, asked vendor to resend license');
+  assert.equal(after.note_by, 'Mai');
+
+  const latest = getHistory(db, b.id)[0];
+  assert.equal(latest.from_stage, 'KYC Docs Received');
+  assert.equal(latest.to_stage, 'KYC Docs Received');
+  assert.equal(latest.changed_by, 'Mai');
+});
+
+test('a note-only row does not hide the real stage change from the stuck clock', () => {
+  const db = setup();
+  const f = find(db, 'Company F');
+  changeStage(db, { vendorId: f.id, expectedStage: 'Contract Sent', newStage: 'Contract Signed', user: 'Linh', now: NOW });
+  const later = new Date(NOW.getTime() + 3 * 24 * 60 * 60 * 1000);
+  addNote(db, { vendorId: f.id, expectedStage: 'Contract Signed', user: 'Linh', now: later, note: 'chasing vendor' });
+  assert.equal(listVendors(db, later).find((v) => v.name === 'Company F').days_in_stage, 3);
+});
+
+test('an older note stays visible after a move without a note', () => {
+  const db = setup();
+  const b = find(db, 'Company B'); // seeded with a note
+  changeStage(db, { vendorId: b.id, expectedStage: 'KYC Docs Received', newStage: 'KYC Verified', user: 'Mai', now: NOW });
+  const after = find(db, 'Company B');
+  assert.equal(after.note, 'Waiting on business license re-upload');
+  assert.equal(after.note_by, 'Huy');
+});
+
+test('note-only: empty note, stale stage and bad types are rejected', () => {
+  const db = setup();
+  const f = find(db, 'Company F');
+  const add = (over) => () => addNote(db, { vendorId: f.id, expectedStage: 'Contract Sent', user: 'Linh', now: NOW, note: 'ok', ...over });
+  assert.throws(add({ note: '   ' }), { status: 400 });
+  assert.throws(add({ note: undefined }), { status: 400 });
+  assert.throws(add({ note: { a: 1 } }), { status: 400 });
+  assert.throws(add({ expectedStage: 'Active' }), { status: 409 });
+  assert.throws(add({ vendorId: 999 }), { status: 404 });
+  assert.equal(getHistory(db, f.id).length, 1);
+});
+
+test('missing expectedStage is a 400, not a stale-update 409', () => {
+  const db = setup();
+  const f = find(db, 'Company F');
+  assert.throws(
+    () => changeStage(db, { vendorId: f.id, newStage: 'Contract Signed', user: 'Linh', now: NOW }),
+    { status: 400 }
+  );
+  assert.throws(() => addNote(db, { vendorId: f.id, user: 'Linh', now: NOW, note: 'x' }), { status: 400 });
 });

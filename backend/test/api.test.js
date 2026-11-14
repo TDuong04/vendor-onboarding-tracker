@@ -44,3 +44,19 @@ test('invalid JSON body gets 400, not 500', async () => {
   const res = await fetch(`${base}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad' });
   assert.equal(res.status, 400);
 });
+
+test('POST note keeps the stage; missing expectedStage is 400; stale is 409', async () => {
+  const { json: login } = await call('/api/login', { body: { username: 'Huy', password: 'password' } });
+  const token = login.token;
+  const before = await call('/api/vendors', { token });
+  const e = before.json.vendors.find((v) => v.name === 'Company E');
+
+  const ok = await call(`/api/vendors/${e.id}/note`, { token, body: { expectedStage: e.stage, note: 'asked to resend' } });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.stage, e.stage);
+  assert.equal(ok.json.days_in_stage, e.days_in_stage);
+
+  assert.equal((await call(`/api/vendors/${e.id}/note`, { token, body: { note: 'x' } })).status, 400);
+  assert.equal((await call(`/api/vendors/${e.id}/note`, { token, body: { expectedStage: 'Active', note: 'x' } })).status, 409);
+  assert.equal((await call(`/api/vendors/${e.id}/stage`, { token, body: { newStage: 'KYC Verified' } })).status, 400);
+});
