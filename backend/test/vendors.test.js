@@ -80,3 +80,15 @@ test('unknown vendor and unknown stage are rejected', () => {
   assert.throws(() => changeStage(db, { vendorId: 999, expectedStage: 'x', newStage: 'Active', user: 'Linh', now: NOW }), { status: 404 });
   assert.throws(() => changeStage(db, { vendorId: 1, expectedStage: 'Active', newStage: 'Bogus', user: 'Linh', now: NOW }), { status: 400 });
 });
+
+test('bad notes are rejected and nothing is written', () => {
+  const db = setup();
+  const f = find(db, 'Company F');
+  const move = (note) => () =>
+    changeStage(db, { vendorId: f.id, expectedStage: 'Contract Sent', newStage: 'Contract Signed', user: 'Linh', now: NOW, note });
+  assert.throws(move({ a: 1 }), { status: 400 }); // not text
+  assert.throws(move('x'.repeat(501)), { status: 400 }); // too long
+  assert.equal(getHistory(db, f.id).length, 1);
+  move('x'.repeat(500))(); // exactly the limit is fine
+  assert.equal(getHistory(db, f.id).length, 2);
+});

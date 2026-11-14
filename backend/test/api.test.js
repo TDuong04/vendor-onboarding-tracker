@@ -39,3 +39,8 @@ test('who changed it comes from the login, not from the request', async () => {
   const history = await call('/api/vendors/6/history', { token: login.token });
   assert.equal(history.json[0].changed_by, 'Mai');
 });
+
+test('invalid JSON body gets 400, not 500', async () => {
+  const res = await fetch(`${base}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad' });
+  assert.equal(res.status, 400);
+});

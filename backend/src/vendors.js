@@ -1,6 +1,8 @@
 // Business logic: read vendors, change a stage. No HTTP in here.
 import { STAGES, isMoveAllowed, daysInStage, isStuck } from './stages.js';
 
+const MAX_NOTE_LENGTH = 500;
+
 // An error that carries the HTTP status the server should answer with.
 export class AppError extends Error {
   constructor(status, message) {
@@ -49,6 +51,9 @@ function getVendor(db, vendorId) {
 // the vendor in the meantime, we refuse instead of silently overwriting their work.
 export function changeStage(db, { vendorId, expectedStage, newStage, user, now, note }) {
   if (!STAGES.includes(newStage)) throw new AppError(400, `Unknown stage: ${newStage}`);
+  if (note != null && (typeof note !== 'string' || note.length > MAX_NOTE_LENGTH)) {
+    throw new AppError(400, `Note must be text of at most ${MAX_NOTE_LENGTH} characters`);
+  }
 
   // The read and the write happen together, so two requests cannot both pass the check.
   db.exec('BEGIN IMMEDIATE');
