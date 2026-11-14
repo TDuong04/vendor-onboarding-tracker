@@ -21,6 +21,9 @@ Data lives in memory and is re-seeded on every start. Seed dates are "N days ago
 1. **Stuck vendors are invisible.** Nothing compares "Last Updated" to today, so a vendor can sit at a stage for weeks. The app computes days in stage itself and flags vendors past 7 days.
 2. **No audit trail.** When a row looks wrong, nobody can tell who changed it, when, or from what. Every stage change is now stored as a history row (who, when, from, to, optional note).
 3. **Manual, easy-to-get-wrong data.** "Last Updated" is typed by hand and the stage is free text. Three people edit the same sheet at once and can overwrite each other silently. Now the date comes from the system clock, stages are a fixed list with allowed moves, and a stale edit is rejected.
+4. **[Domain knowledge] KYC results live outside the sheet.** Compliance reviews documents in Slack, so a failed review leaves no trace in the spreadsheet: the row just sits at "KYC Docs Received" and looks like nothing happened. The app lets a coordinator **Log note** (e.g. "asked vendor to resend license") without moving the stage, saved in the history with who and when.
+
+   I did not know what "KYC" meant when I started. I looked it up: it stands for "Know Your Customer", the identity and legitimacy check a company runs on a new customer or partner before doing business with them. From that I inferred how it fits this workflow: the vendor sends documents, Compliance reviews them, and the vendor cannot go Active until the review passes. That inference is why the app does not allow skipping straight to Active, and why a failed review leaves the vendor at "KYC Docs Received" instead of moving it. I have not seen Shopee's real compliance process, so details beyond what the PDF says are my reading of it.
 
 ## Approach
 
@@ -48,10 +51,6 @@ Code layout (each file has one job):
 - **Stale-update check.** The browser sends the stage it was looking at. If the vendor has moved since, the server answers 409 and the UI reloads. This covers the "3 coordinators at once" case. The check and the write share one transaction (`BEGIN IMMEDIATE`).
 - **The clock is a parameter** (`now`), so tests freeze time instead of waiting for days.
 - **Errors are one small class (`AppError`)** carrying an HTTP status. One handler turns it into a response.
-
-## Domain note: KYC
-
-I did not know what "KYC" meant when I started. I looked it up: it stands for "Know Your Customer", the identity and legitimacy check a company runs on a new customer or partner before doing business with them. From that I inferred how it fits this workflow: the vendor sends documents, Compliance reviews them, and the vendor cannot go Active until the review passes. That inference is why the app does not allow skipping straight to Active, and why a failed review leaves the vendor at "KYC Docs Received" instead of moving it. I have not seen Shopee's real compliance process, so details beyond what the PDF says are my reading of it.
 
 ## Assumptions
 
